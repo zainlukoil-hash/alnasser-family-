@@ -1,7 +1,7 @@
-/* Al-Nasser family platform · the page's worker · build 194
+/* Al-Nasser family platform · the page's worker · build 195
    It does three small things: it makes the page installable as an app, it keeps one copy of the page for opening without the internet
    (the page is always asked from the network first, so a new build is never hidden by an old copy), and it can tell the phone that a newer build is out. */
-var B = 194, CACHE = 'nsr-page';
+var B = 195, CACHE = 'nsr-page';
 self.addEventListener('install', function (e) { self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
   e.waitUntil(self.clients.claim());
