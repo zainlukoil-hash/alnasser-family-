@@ -1,7 +1,7 @@
-/* Al-Nasser family platform · the page's worker · build 203
+/* Al-Nasser family platform · the page's worker · build 204
    It does three small things: it makes the page installable as an app, it keeps one copy of the page for opening without the internet
    (the page is always asked from the network first, so a new build is never hidden by an old copy), and it can tell the phone that a newer build is out. */
-var B = 203, CACHE = 'nsr-page';
+var B = 204, CACHE = 'nsr-page';
 self.addEventListener('install', function (e) { self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
   e.waitUntil(self.clients.claim());
@@ -35,6 +35,34 @@ self.addEventListener('fetch', function (e) {
     })
   );
 });
+/* build 204 · the page's own update talk (it was written long ago and never answered): «are you there?» → «yes»; «bring build N» → the new page is fetched here, in the background, with progress,
+   and kept; the page then starts it by itself. While it comes, the page in use goes on working. */
+self.addEventListener('message', function (e) {
+  var d = e.data || {}, src = e.source;
+  function say(m) { try { if (src) src.postMessage(m); } catch (x) {} }
+  if (d.type === 'afia-ping') { say({ type: 'afia-pong', b: B }); return; }
+  if (d.type === 'afia-refresh') e.waitUntil(pull(d, say));
+});
+function pull(d, say) {
+  return fetch('./index.html', { cache: 'reload' }).then(function (res) {
+    if (!res || !res.ok) throw 'http ' + (res && res.status);
+    var rd = res.body && res.body.getReader ? res.body.getReader() : null, parts = [], got = 0, last = 0;
+    if (!rd) return res.blob();
+    return (function pump() {
+      return rd.read().then(function (x) {
+        if (x.done) return new Blob(parts, { type: 'text/html; charset=utf-8' });
+        parts.push(x.value); got += x.value.length;
+        var n = Date.now(); if (n - last > 200) { last = n; say({ type: 'afia-prog', got: got, tot: d.size || 0 }); }
+        return pump();
+      });
+    })();
+  }).then(function (blob) {
+    if (!blob || blob.size < 1000000) throw 'short';
+    return caches.open(CACHE).then(function (c) {
+      return c.put('./index.html', new Response(blob, { headers: { 'content-type': 'text/html; charset=utf-8' } }));
+    });
+  }).then(function () { say({ type: 'afia-ready', b: d.build }); }, function (err) { say({ type: 'afia-fail', why: String((err && err.message) || err) }); });
+}
 function check() {
   return fetch('latest.json?_=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
     if (j && j.b > B) return self.registration.showNotification('منصة عائلة الناصر', { body: 'نزل إصدار أحدث. افتح المنصة ليتحدّث تلقائياً.', tag: 'nsr-upd', icon: 'icon-192.png' });
